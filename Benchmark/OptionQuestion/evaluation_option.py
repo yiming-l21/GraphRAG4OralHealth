@@ -21,18 +21,47 @@ from datetime import datetime
 from time import mktime
 from urllib.parse import urlencode
 from wsgiref.handlers import format_date_time
-
 import websocket
 import openpyxl
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
+from modelscope import AutoModelForCausalLM, AutoTokenizer
+
+
 # 设置 API 密钥
 openai.api_key = 'openai_api_key'
 # 使用目录路径
 directory_path = './Benchmark/OptionQuestion/'
-
+# model_name = "/home/lym/.cache/modelscope/hub/Qwen/Qwen2.5-7B-Instruct"
+# model = AutoModelForCausalLM.from_pretrained(
+#     model_name,
+#     torch_dtype="auto",
+#     device_map="auto"
+# )
+# tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 #不同模型的推理接口，输入问题，返回答案
+def QWen25_7b_inference(prompt):
+    messages = [
+        {"role": "system", "content": "你是一个医学知识问答机器人。"},
+        {"role": "user", "content": prompt}
+    ]
+    text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True
+    )
+    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    generated_ids = model.generate(
+        **model_inputs,
+        max_new_tokens=512
+    )
+    generated_ids = [
+        output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
+    ]
+    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    # 提取模型生成的文本
+    return response.strip()
 def baidu01_inference(prompt):
     '''实现百度灵医大模型的推理接口，输入用户的prompt，返回模型生成的文本信息'''
     #TODO
@@ -74,7 +103,7 @@ def ChatGLM_inference(prompt):
     )
     # 提取模型生成的文本
     return dict(response.choices[0].message)["content"].strip()
-def QWen_inference(prompt):
+def QWenplus_inference(prompt):
     messages=[{"role": "system", "content": "你是一个医学知识问答机器人。"},{"role": "user", "content": prompt}]
     response = dashscope.Generation.call(
     # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx",
@@ -160,15 +189,29 @@ def XunfeiSpark_inference(prompt):
     ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
     
     return ''.join(result)
-
+def deepseek_inference(prompt):
+    import os
+    from openai import OpenAI
+    client = OpenAI(
+        # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx",
+        api_key="sk-969f4200d53442a2a1733d1c0b1fb330",  # 如何获取API Key：https://help.aliyun.com/zh/model-studio/developer-reference/get-api-key
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+    )
+    completion = client.chat.completions.create(
+        model="deepseek-v3",  # 此处以 deepseek-r1 为例，可按需更换模型名称。
+        messages=[
+            {'role': 'user', 'content': prompt}
+        ]
+    )
+    return completion.choices[0].message.content
 
 
 # 评估函数，输入目录路径和模型推理函数，返回正确问题数和总问题数
 def get_score(directory_path, model_inference):
     def process_question(ques_text, correct_answer):
         result = model_inference(ques_text)
-        print(f"Answer: {result}\nCorrect Answer: {correct_answer}")
-        print(result in correct_answer or correct_answer in result)
+        #print(f"Answer: {result}\nCorrect Answer: {correct_answer}")
+        #print(result in correct_answer or correct_answer in result)
         return result in correct_answer or correct_answer in result
 
     result_list=[]
@@ -181,6 +224,8 @@ def get_score(directory_path, model_inference):
             with open(json_path, 'r', encoding='utf-8') as f:
                 json_data = json.load(f)
             for question in json_data.get('独立题', []):
+                if total_question%20==0:
+                    print(f"Correct question: {correct_question}/{total_question}")
                 total_question += 1
                 ques_text = (
                     "下面我会给你一个医学相关的问题，请你根据医学知识进行回答。"
@@ -192,6 +237,8 @@ def get_score(directory_path, model_inference):
                     correct_question += 1
 
             for question in json_data.get('共用题干题', []):
+                if total_question%20==0:
+                    print(f"Correct question: {correct_question}/{total_question}")
                 total_question += len(question['答案'])
                 for idx in range(len(question['答案'])):
                     ques_text = (
@@ -204,6 +251,8 @@ def get_score(directory_path, model_inference):
                         correct_question += 1
 
             for question in json_data.get('共用备选题', []):
+                if total_question%20==0:
+                    print(f"Correct question: {correct_question}/{total_question}")
                 total_question += len(question['答案'])
                 for idx in range(len(question['答案'])):
                     ques_text = (
@@ -229,7 +278,7 @@ def save_result(result_list,topic):
 topic_list=["MedicalHumanity","Clinical","Dentistry","Medical"]
 for topic in topic_list:
     path=directory_path+topic
-    result_list = get_score(path,baidu01_inference)
+    result_list = get_score(path,deepseek_inference)
     save_result(result_list,topic)
     print(f"Finished {topic}")
     

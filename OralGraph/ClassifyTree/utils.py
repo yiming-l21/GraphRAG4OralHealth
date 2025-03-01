@@ -17,6 +17,8 @@ def extract_disease_keys(data, depth=0):
                     print("包含")
                     disease_keys.extend(extract_disease_keys(value, depth+1))
             else:
+                if key in ["预防措施","治疗方法","病因描述","临床表现","疾病定义","诊断原则","病理描述"]:
+                    continue
                 disease_keys.append((key,depth))
                 disease_keys.extend(extract_disease_keys(value, depth+1))
     return disease_keys
@@ -24,17 +26,17 @@ def extract_disease_keys(data, depth=0):
 def revise_property_keys(data):
     new_data = {}
     for key, value in data.items():
+        print(key)
         if isinstance(value, dict):
             key= "包含" if key == "包括" else key
             new_data[key] = revise_property_keys(value)
         else:
-            key="用法用量" if key=="用法" or key=="治疗方法" else key
-            key="适用症" if key =="临床应用" or key=="适应症" or key== "功能主治" or key=="适用病症" else key
-            key ="成份" if key=="成分" else key
-            key = "预防机制" if key=="药理作用" or key =="机制作用" or key=='作用机制' else key
-            key="禁忌" if key == "禁忌症" else key
-            key ="处方组成" if key =="方剂组成" else key
-            key="使用器械" if key=="使用设备" else key
+            key = "预防措施" if key=="预防" or key =="预防方法" or key=='作用机制' else key
+            key = "治疗方法" if key=="治疗" or key =="治疗原则" or key=="治疗原则与方法" else key
+            key = "病因描述" if key=="病因及发病机制" or key =="原因" or key =="病因" or key == "发病机制" or key == "病因和发病机制" else key
+            key = "临床表现" if key=="主要表现" or key == "口腔表现" else key
+            key = "疾病定义" if key=="定义"  else key
+            key = "诊断原则" if key =="诊断" or key == "诊断方法" or key == "临床表现与诊断" or key=="诊断要点" or key == "诊断与鉴别诊断" else key
             new_data[key] = value
     return new_data
 def get_node_block(key,value):
@@ -96,7 +98,7 @@ if __name__ == "__main__":
     parser.add_argument("--output_path", type=str,  help="path to the output json file")
     parser.add_argument("--output_info",type=bool,default=False,help="whether to output the information")
     parser.add_argument("--clean_data",type=bool,default=False,help="whether to clean the data")
-    parser.add_argument("--store_neo4j",type=str,default=False,help="whether to store the data into neo4j")
+    parser.add_argument("--store_neo4j",type=str,default=False,help="label of the neo4j node")
     args = parser.parse_args()
     with open(args.json_path, "r") as f:
         data = json.load(f)
