@@ -26,20 +26,12 @@ import openpyxl
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 from modelscope import AutoModelForCausalLM, AutoTokenizer
-<<<<<<< HEAD:Benchmark/Knowledge Objectives/evaluation_option.py
 import re
-=======
-
->>>>>>> be04167d1e037d1a539d9a9dc71b8cf0a5b30070:Benchmark/OptionQuestion/evaluation_option.py
 
 # 设置 API 密钥
 openai.api_key = 'openai_api_key'
 # 使用目录路径
-<<<<<<< HEAD:Benchmark/Knowledge Objectives/evaluation_option.py
 directory_path = './Benchmark/Knowledge Objectives/'
-=======
-directory_path = './Benchmark/OptionQuestion/'
->>>>>>> be04167d1e037d1a539d9a9dc71b8cf0a5b30070:Benchmark/OptionQuestion/evaluation_option.py
 # model_name = "/home/lym/.cache/modelscope/hub/Qwen/Qwen2.5-7B-Instruct"
 # model = AutoModelForCausalLM.from_pretrained(
 #     model_name,
@@ -47,7 +39,6 @@ directory_path = './Benchmark/OptionQuestion/'
 #     device_map="auto"
 # )
 # tokenizer = AutoTokenizer.from_pretrained(model_name)
-<<<<<<< HEAD:Benchmark/Knowledge Objectives/evaluation_option.py
 model_name = "/home/lym/3l-dentalmind-backend/lllchat/model_files/deepthinking_model"
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
@@ -84,9 +75,6 @@ def DentalMind_o1_inference(prompt):
     
     print("Response content:", response_content)
     return response_content.strip()
-=======
-
->>>>>>> be04167d1e037d1a539d9a9dc71b8cf0a5b30070:Benchmark/OptionQuestion/evaluation_option.py
 #不同模型的推理接口，输入问题，返回答案
 def QWen25_7b_inference(prompt):
     messages = [
@@ -257,11 +245,7 @@ def deepseek_inference(prompt):
 def get_score(directory_path, model_inference):
     def process_question(ques_text, correct_answer):
         result = model_inference(ques_text)
-<<<<<<< HEAD:Benchmark/Knowledge Objectives/evaluation_option.py
         print(f"Answer: {result}\nCorrect Answer: {correct_answer}")
-=======
-        #print(f"Answer: {result}\nCorrect Answer: {correct_answer}")
->>>>>>> be04167d1e037d1a539d9a9dc71b8cf0a5b30070:Benchmark/OptionQuestion/evaluation_option.py
         #print(result in correct_answer or correct_answer in result)
         return result in correct_answer or correct_answer in result
 
@@ -329,11 +313,7 @@ def save_result(result_list,topic):
 topic_list=["MedicalHumanity","Clinical","Dentistry","Medical"]
 for topic in topic_list:
     path=directory_path+topic
-<<<<<<< HEAD:Benchmark/Knowledge Objectives/evaluation_option.py
     result_list = get_score(path,DentalMind_o1_inference)
-=======
-    result_list = get_score(path,deepseek_inference)
->>>>>>> be04167d1e037d1a539d9a9dc71b8cf0a5b30070:Benchmark/OptionQuestion/evaluation_option.py
     save_result(result_list,topic)
     print(f"Finished {topic}")
     
