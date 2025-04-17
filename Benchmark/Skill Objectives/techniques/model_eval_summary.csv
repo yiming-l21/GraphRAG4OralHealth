@@ -1,0 +1,4 @@
+﻿Model,Accuracy,Completeness,Safety,Understanding,Logic,Total
+QWenplus,1.63,1.25,2.0,1.88,1.97,8.74
+ChatGLM,1.32,1.19,1.99,1.79,1.91,8.21
+DentalMind_base,1.33,1.19,1.99,1.72,1.83,8.05

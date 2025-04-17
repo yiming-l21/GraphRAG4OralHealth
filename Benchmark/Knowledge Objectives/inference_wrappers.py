@@ -40,13 +40,13 @@ dashscope.api_key = "sk-969f4200d53442a2a1733d1c0b1fb330"
 #     device_map="auto"
 # )
 # tokenizer = AutoTokenizer.from_pretrained(model_name)
-model_name = "/home/lym/DentalMind_o1"
-model = AutoModelForCausalLM.from_pretrained(
-    model_name,
-    torch_dtype="auto",
-    device_map="auto"
-)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+# model_name = "/home/lym/DentalMind_o1"
+# model = AutoModelForCausalLM.from_pretrained(
+#     model_name,
+#     torch_dtype="auto",
+#     device_map="auto"
+# )
+# tokenizer = AutoTokenizer.from_pretrained(model_name)
 # model_name = "/home/lym/DentalMind_base"
 # model = AutoModelForCausalLM.from_pretrained(
 #     model_name,
@@ -347,4 +347,4 @@ def deepseek_r1_inference(prompt):
             {'role': 'user', 'content': prompt}
         ]
     )
-    return completion.choices[0].message.content
+    return completion.choices[0].message.content,completion.choices[0].message.reasoning_content
