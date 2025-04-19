@@ -1,24 +1,9 @@
 import os
 import json
 from glob import glob
-
+from inference_wrappers import deepseek_r1_inference
 # === 路径设置 ===
-base_dir = "/home/lym/GraphRAG4OralHealth/Benchmark/Knowledge Objectives/Answer/qwen-max"
-response_path = "/home/lym/GraphRAG4OralHealth/Benchmark/Knowledge Objectives/d9a655c6-59ad-48cd-9c6d-81ff253465e4_1744800934181_success.jsonl"  # 你的模型响应结果文件
-
-# === 加载响应文件（每行一个 JSON） ===
-responses = []
-with open(response_path, "r", encoding="utf-8") as f:
-    for line in f:
-        if line.strip():
-            data = json.loads(line)
-            msg = data["response"]["body"]["choices"][0]["message"]
-            responses.append({
-                "prediction": msg.get("content", "").strip(),
-                "reason": msg.get("reasoning_content", "").strip()
-            })
-
-print(f"✅ 加载响应总数: {len(responses)}")
+base_dir = "/home/lym/GraphRAG4OralHealth/Benchmark/Knowledge Objectives/Answer/deepseek_r1"
 
 # === 遍历所有子目录下的 JSON 文件并填入 prediction 和 reason ===
 response_index = 0
@@ -39,15 +24,21 @@ for root, dirs, files in os.walk(base_dir):
 
         updated = False
         for q in data:
-            if response_index >= len(responses):
-                print(f"⚠️ 响应数量不足，已跳出")
-                break
             if "prediction" in q and "reason" in q:
-                q["prediction"] = responses[response_index]["prediction"]
-                q["reason"] = responses[response_index]["reason"]
-                response_index += 1
-                updated = True
-
+                if q["prediction"] != "":
+                    continue
+                else:
+                    ques_text = (
+                    "下面我会给你一个医学相关的问题，请你根据医学知识进行回答。"
+                    "一个题目有5个选项，请选出最合适的选项，并输出选项前字母。"
+                    "注意只需要输出选项前字母，不需要输出任何其他内容。\n"
+                    f"题目:\n{q['题目']}\n选项:\n{q['选项']}"
+                )
+                    q["prediction"],q["reason"] = deepseek_r1_inference(ques_text)
+                    print(f" 题目: {q['题目']}")
+                    print(f" 预测: {q['prediction']} 理由: {q['reason']}")
+                    response_index += 1
+                    updated = True
         if updated:
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)

@@ -25,8 +25,6 @@ def get_model_names(directory_path):
     for folder_name in os.listdir(directory_path):
         folder_path = os.path.join(directory_path, folder_name)
         if os.path.isdir(folder_path):
-            if folder_name == "DentalMind_o1":
-                continue
             model_names.append(folder_name)
     return model_names
 model_list = get_model_names(working_directory)
