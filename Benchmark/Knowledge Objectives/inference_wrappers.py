@@ -29,6 +29,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 from modelscope import AutoModelForCausalLM, AutoTokenizer
 import re
+from RAG.retriever.query_entity_extractor import extract_query_entities
+from RAG.retriever.query_graph_resolver import QueryGraphResolver
+from RAG.retriever.query_relation_extractor import extract_entity_relations
+from RAG.storage.entity_vector_storage import EntityVectorStorage
+from RAG.storage.neo4j_client import Neo4jClient
 dashscope.api_key = "sk-969f4200d53442a2a1733d1c0b1fb330"
 # 设置 API 密钥
 #openai.api_key = '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'
@@ -46,14 +51,14 @@ dashscope.api_key = "sk-969f4200d53442a2a1733d1c0b1fb330"
 #     torch_dtype="auto",
 #     device_map="auto"
 # )
-# tokenizer = AutoTokenizer.from_pretrained(model_name)
-# model_name = "/home/lym/DentalMind_base"
-# model = AutoModelForCausalLM.from_pretrained(
-#     model_name,
-#     torch_dtype="auto",
-#     device_map="auto"
-# )
-# tokenizer = AutoTokenizer.from_pretrained(model_name)
+#tokenizer = AutoTokenizer.from_pretrained(model_name)
+model_name = "/home/lym/DentalMind_base"
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    torch_dtype="auto",
+    device_map="auto"
+)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
 def model_judge1(prompt):
     #实现GPT4的推理接口，输入用户的prompt，返回模型生成的文本信息
     response = openai.ChatCompletion.create(
@@ -80,7 +85,43 @@ def model_judge(prompt: str):
     except Exception as e:
         print(f"❌ Judge失败: {e}")
         return ""
-
+async def DentalMind_graph_inference(prompt):
+    '''实现DentalMind模型的推理接口，输入用户的prompt，返回模型生成的文本信息'''
+    # 1) 构建初始 Query‑Graph（实体+关系）
+    entities = extract_query_entities(prompt)
+    graph=extract_entity_relations(prompt, entities)
+    vdb = EntityVectorStorage("/home/lym/GraphRAG4OralHealth/GraphRAG_System/data/node_properties_embeddings_typed.npz")
+    neo4j_client = Neo4jClient(
+        url="bolt://127.0.0.1:9687",
+        user="neo4j",
+        password="medical_neo4j"
+    )
+    # 3) 用QueryGraphResolver补全图信息
+    resolver = QueryGraphResolver(vdb, neo4j_client)
+    resolved = await resolver.resolve(graph)
+    print("Resolved Query Graph:")
+    print(resolved)
+    prompt="你可以参考以下知识图中的实体和关系，回答以下问题：\n知识图谱:"+str(resolved)+"\n问题："+prompt+"要求：知识图谱信息不一定和问题答案相关，你需要斟酌，不一定采用，但知识图谱信息一定是正确无误的"
+    messages = [
+        {"role": "system", "content": "你是一个医学知识问答机器人。"},
+        {"role": "user", "content": prompt}
+    ]
+    text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True
+    )
+    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    generated_ids = model.generate(
+        **model_inputs,
+        max_new_tokens=2048
+    )
+    generated_ids = [
+        output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
+    ]
+    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    # 提取模型生成的文本
+    return response.strip(),graph
 def DentalMind_base_inference(prompt):
     '''实现DentalMind模型的推理接口，输入用户的prompt，返回模型生成的文本信息'''
     messages = [

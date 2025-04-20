@@ -263,32 +263,38 @@ def flatten_with_count(hierarchy, subject_tree, model_list):
 
 flat_rows = flatten_with_count(subject_hierarchy, subject_tree, model_list)[:-1]
 print(f"📊 扁平化数据行数: {len(flat_rows)}")
-# ------- 构造 DataFrame -------
-columns = ["科目", "数量"] + model_list
-table_data = []
-for name, is_parent, count, acc_dict in flat_rows:
-    row = {"科目": name, "数量": count}
-    for model in model_list:
-        row[model] = acc_dict.get(model, "")
-    table_data.append(row)
-
-df = pd.DataFrame(table_data)
-
 # -------- Excel 写入 + 样式增强 --------
 from openpyxl import load_workbook
 from openpyxl.styles import Font
 
 excel_path = "模型评估结果_最终版.xlsx"
+custom_model_order = [
+    "GPT-4-turbo", "GPT-3.5-turbo", "deepseek-v3", "deepseek-r1",
+    "Qwen-max", "Qwen-plus", "QWen2.5-7b-instruct", "ChatGLM-4",
+    "XunfeiSpark", "DentalMind_base", "DentalMind_o1", "DentalMind_o1+GraphRAG"
+]
+
+columns = ["科目", "数量"] + custom_model_order
+table_data = []
+for name, is_parent, count, acc_dict in flat_rows:
+    row = {"科目": name, "数量": count}
+    for model in custom_model_order:
+        row[model] = acc_dict.get(model, "")
+    table_data.append(row)
+
+df = pd.DataFrame(table_data)[columns]  # 明确列顺序
+
+# 写入 Excel
 with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
     df.to_excel(writer, index=False, sheet_name="准确率统计")
 
-    # 加粗父节点字体
+    # 样式
     workbook = writer.book
     worksheet = writer.sheets["准确率统计"]
-
-    for row_idx, (name, is_parent, *_rest) in enumerate(flat_rows, start=2):  # Excel起始于第2行
+    for row_idx, (name, is_parent, *_rest) in enumerate(flat_rows, start=2):
         if is_parent:
             cell = worksheet[f"A{row_idx}"]
             cell.font = Font(bold=True)
 
-print(f"📊 Excel 文件已保存至：{excel_path}")
+print(f"✅ Excel 写入完成，列顺序为自定义模型顺序：{custom_model_order}")
+

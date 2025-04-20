@@ -4,7 +4,7 @@ import glob
 from inference_wrappers import (
     deepseek_inference, XunfeiSpark_inference, QWenplus_inference,
     ChatGLM_inference, GPT4_inference, GPT3_inference, QWen25_7b_inference,
-    deepseek_r1_inference, DentalMind_o1_inference, DentalMind_base_inference
+    deepseek_r1_inference, DentalMind_o1_inference, DentalMind_base_inference,DentalMind_graph_inference
 )
 
 # ------------ 模型配置区 ------------
@@ -18,11 +18,12 @@ model_config_dict = {
     "QWen25_7b": {"model": QWen25_7b_inference},
     "deepseek_r1": {"model": deepseek_r1_inference},
     "DentalMind_o1": {"model": DentalMind_o1_inference},
-    "DentalMind_base": {"model": DentalMind_base_inference}
+    "DentalMind_base": {"model": DentalMind_base_inference},
+    "DentalMind_graph":{"model": DentalMind_graph_inference}
 }
 
 # 选择模型名称
-model_name = "deepseek_r1"
+model_name = "DentalMind_graph"
 model_inference = model_config_dict[model_name]["model"]
 
 # 保存路径
@@ -42,9 +43,9 @@ def save_result(result_dict, topic, json_path):
 # ------------ 主推理函数（单线程） ------------
 from tqdm import tqdm
 
-def get_answer(directory_path, model_inference, topic):
-    def process_question(ques_text):
-        response_content, reasoning_content = model_inference(ques_text)
+async def get_answer(directory_path, model_inference, topic):
+    async def process_question(ques_text):
+        response_content, reasoning_content = await model_inference(ques_text)
         print(ques_text)
         print(response_content)
         return response_content, reasoning_content
@@ -63,7 +64,7 @@ def get_answer(directory_path, model_inference, topic):
                 "注意只需要输出选项前字母，不需要输出任何其他内容。\n"
                 f"题目:\n{question.get('题干', question.get('题目'))}\n选项:\n{question['选项']}"
             )
-            res_content, res_reasoning = process_question(ques_text)
+            res_content, res_reasoning =await process_question(ques_text)
             result_list.append({
                 "题目": question.get('题干', question.get('题目')),
                 "选项": question['选项'],
@@ -112,13 +113,20 @@ def get_answer(directory_path, model_inference, topic):
 
 
 
-# ------------ 运行入口 ------------
-if __name__ == "__main__":
+import os
+import asyncio  # 别忘了引入 asyncio
+
+async def main():
     topic_list = ["MedicalHumanity", "Clinical", "Dentistry", "Medical"]
     directory_path = "/home/lym/GraphRAG4OralHealth/Benchmark/Knowledge Objectives/"
 
     for topic in topic_list:
         path = os.path.join(directory_path, topic)
-        get_answer(path, model_inference, topic)
+        await get_answer(path, model_inference, topic)
 
     print("✅ 所有题目处理完毕！")
+
+# ------------ 运行入口 ------------
+if __name__ == "__main__":
+    asyncio.run(main())
+
