@@ -134,19 +134,19 @@ async def async_summarize_relationship(src, props_src, rel_type, tgt, props_tgt)
 async def run_full_embedding_pipeline(exporter: Neo4jExporter, save_dir="./embed_npz"):
     os.makedirs(save_dir, exist_ok=True)
 
-    # # --- 实体处理 ---
-    # print("[Step 1] 提取实体...")
-    # entities = list(exporter.extract_entities())
-    # entity_keys = [r["name"] or r["props"].get("名称") or "未知实体" for r in entities]
+    # --- 实体处理 ---
+    print("[Step 1] 提取实体...")
+    entities = list(exporter.extract_entities())
+    entity_keys = [r["name"] or r["props"].get("名称") or "未知实体" for r in entities]
 
-    # print("[Step 2] 并发生成实体摘要...")
-    # entity_texts = await tqdm_asyncio.gather(*[
-    #     async_summarize_properties(name, dict(r["props"])) for name, r in zip(entity_keys, entities)
-    # ], desc="摘要实体", total=len(entity_keys))
+    print("[Step 2] 并发生成实体摘要...")
+    entity_texts = await tqdm_asyncio.gather(*[
+        async_summarize_properties(name, dict(r["props"])) for name, r in zip(entity_keys, entities)
+    ], desc="摘要实体", total=len(entity_keys))
 
-    # print("[Step 3] 嵌入实体...")
-    # entity_embeddings = await get_embedding(entity_texts)
-    # save_embeddings_to_disk(entity_keys, entity_embeddings, os.path.join(save_dir, "entity_embeddings.npz"))
+    print("[Step 3] 嵌入实体...")
+    entity_embeddings = await get_embedding(entity_texts)
+    save_embeddings_to_disk(entity_keys, entity_embeddings, os.path.join(save_dir, "node_properties_entity_embeddings.npz"))
 
     # --- 关系处理 ---
     print("[Step 4] 提取关系...")

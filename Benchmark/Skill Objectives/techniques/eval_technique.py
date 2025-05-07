@@ -143,25 +143,62 @@ def main():
 
     api_key = "sk-969f4200d53442a2a1733d1c0b1fb330"
 
+    # 加载数据
     model_data = {item["Q"].strip(): item["A"].strip() for item in json.load(open(args.model_file))}
     ref_data   = {item["Q"].strip(): item["A"].strip() for item in json.load(open(args.ref_file))}
 
     results = []
-    for i, (q, cand_ans) in enumerate(model_data.items(), start=1):
-        ref_ans = ref_data.get(q)
-        if not ref_ans:
-            print(f"⚠️ 无法在参考答案中找到该题目：{q}")
-            continue
-        scored = grade_one(f"Q{i}", q, ref_ans, cand_ans, api_key, 1/args.max_qps)
-        results.append(scored)
-        print(f"[{i}] {q[:20]}... ✅")
+    temp_file = Path(args.output_file).with_suffix(".tmp.jsonl")  # 临时文件路径
 
-    # 写入 JSONL
-    with open(args.output_file, "w", encoding="utf-8") as f:
-        for r in results:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    try:
+        # 检查是否已有临时文件，恢复进度
+        if temp_file.exists():
+            print(f"⚠️ 发现临时文件 {temp_file}，尝试恢复进度...")
+            with open(temp_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    results.append(json.loads(line))
+            print(f"✅ 已从临时文件恢复 {len(results)} 条记录。")
 
-    print(f"\n✅ 共评测 {len(results)} 题，结果已写入 {args.output_file}")
+        for i, (q, cand_ans) in enumerate(model_data.items(), start=1):
+            ref_ans = ref_data.get(q)
+            if not ref_ans:
+                print(f"⚠️ 无法在参考答案中找到该题目：{q}")
+                continue
+
+            try:
+                scored = grade_one(f"Q{i}", q, ref_ans, cand_ans, api_key, 1/args.max_qps)
+                results.append(scored)
+                print(f"[{i}] {q[:20]}... ✅")
+            except Exception as e:
+                print(f"⚠️ 评分失败：题目 {q[:20]}... 错误信息：{e}")
+                # 将当前结果保存到临时文件
+                with open(temp_file, "w", encoding="utf-8") as f:
+                    for r in results:
+                        f.write(json.dumps(r, ensure_ascii=False) + "\n")
+                print(f"⚠️ 已将当前进度保存到临时文件 {temp_file}。")
+                raise  # 继续抛出异常，终止程序
+
+            # 定期保存到临时文件
+            if i % 10 == 0:  # 每处理 10 题保存一次
+                with open(temp_file, "w", encoding="utf-8") as f:
+                    for r in results:
+                        f.write(json.dumps(r, ensure_ascii=False) + "\n")
+                print(f"✅ 已将当前进度保存到临时文件 {temp_file}。")
+
+    finally:
+        # 程序结束时清理临时文件并写入最终结果
+        if results:
+            with open(args.output_file, "w", encoding="utf-8") as f:
+                for r in results:
+                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            print(f"\n✅ 共评测 {len(results)} 题，结果已写入 {args.output_file}")
+
+            if temp_file.exists():
+                temp_file.unlink()  # 删除临时文件
+                print(f"✅ 已删除临时文件 {temp_file}。")
+        else:
+            print("⚠️ 未生成任何结果。")
 
 if __name__ == "__main__":
     main()
+

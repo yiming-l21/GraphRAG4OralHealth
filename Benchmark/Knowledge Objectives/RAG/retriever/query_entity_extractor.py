@@ -9,7 +9,7 @@ ENTITY_EXTRACTION_PROMPT = """
 每个实体请包含以下字段：
 
 - name: 实体的专业术语，若问题中未明确出现，用 "?" 代替；
-- type: 实体的类型，请仅从以下列表当中选择:[口腔疾病,器械,文献,检查,治疗,科室,药物,预防]；
+- type: 实体的类型，请仅从以下列表当中选择:[口腔疾病,器械,文献,检查,治疗,科室,药物,预防,口腔组织]；
 - description: 查询当中包含的用于识别该实体的描述,包括实体本身属性以及与其他实体的关系，用于检索实体,如果不是该实体的特异性描述，请不要添加description；
 
 输出格式必须是 JSON 数组。
@@ -40,10 +40,34 @@ ENTITY_EXTRACTION_PROMPT = """
     {{"name": "妊娠期龈炎", "type": "口腔疾病"}},
     {{"name": "?", "type": "科室", "description": "妊娠期龈炎患者就诊的科室"}}
 ]
+问题：
+与牙釉质周期性生长相关的结构不包括
+输出:
+[
+    {{"name": "?", "type": "口腔组织", "description": "与牙釉质周期性生长相关的结构"}}
+]
 请提取下面这个问题的实体：
 "{query}"
 """
+import json
+import re
 
+def safe_extract_json(content: str):
+    """
+    尝试从字符串中提取一个合法的 JSON block。
+    如果提取失败，返回 None。
+    """
+    # 使用正则表达式提取大括号包围的内容
+    matches = re.findall(r'\{(?:[^{}]|(?R))*\}', content, re.DOTALL)
+
+    for match in matches:
+        try:
+            parsed = json.loads(match)
+            return parsed  # 成功解析返回
+        except json.JSONDecodeError:
+            continue  # 尝试下一个匹配项
+
+    return None  # 所有都失败
 def extract_query_entities(query: str) -> list:
     prompt = ENTITY_EXTRACTION_PROMPT.format(query=query)
     try:
@@ -53,7 +77,7 @@ def extract_query_entities(query: str) -> list:
             result_format='message'
         )
         content = response["output"]["choices"][0]["message"]["content"]
-        return json.loads(content)
+        return safe_extract_json(content)
     except Exception as e:
         print(f"❌ 实体抽取失败: {e}")
         return []

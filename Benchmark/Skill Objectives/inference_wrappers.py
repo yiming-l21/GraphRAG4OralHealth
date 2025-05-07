@@ -52,7 +52,51 @@ dashscope.api_key = "sk-969f4200d53442a2a1733d1c0b1fb330"
 #     device_map="auto"
 # )
 # tokenizer = AutoTokenizer.from_pretrained(model_name)
-model_name = "/home/lym/DentalMind_base"
+# model_name = "/home/lym/DentalMind_base"
+# model = AutoModelForCausalLM.from_pretrained(
+#     model_name,
+#     torch_dtype="auto",
+#     device_map="auto"
+# )
+# tokenizer = AutoTokenizer.from_pretrained(model_name)
+# model_name="/home/lym/QWen2.5-Math-1.5B"
+# model = AutoModelForCausalLM.from_pretrained(
+#     model_name,
+#     torch_dtype="auto",
+#     device_map="auto"
+# )
+# tokenizer = AutoTokenizer.from_pretrained(model_name)
+# model_name = "/home/lym/Qwen2.5-14B"
+# model = AutoModelForCausalLM.from_pretrained(
+#     model_name,
+#     torch_dtype="auto",
+#     device_map="auto"
+# )
+# tokenizer = AutoTokenizer.from_pretrained(model_name)
+# model_name = "/home/lym/DeepSeek-R1-Distill-Qwen-14B"
+# model = AutoModelForCausalLM.from_pretrained(
+#     model_name,
+#     torch_dtype="auto",
+#     device_map="auto"
+# )
+# tokenizer = AutoTokenizer.from_pretrained(model_name)
+# print("模型加载完成")
+# print("模型名称:", model_name)
+# model_name = "/home/lym/DeepSeek-R1-Distill-Qwen-7B"
+# model = AutoModelForCausalLM.from_pretrained(
+#     model_name,
+#     torch_dtype="auto",
+#     device_map="auto"
+# )
+# tokenizer = AutoTokenizer.from_pretrained(model_name)
+# model_name = "/home/lym/DeepSeek-R1-Distill-Qwen-1.5B"
+# model = AutoModelForCausalLM.from_pretrained(
+#     model_name,
+#     torch_dtype="auto",
+#     device_map="auto"
+# )
+# tokenizer = AutoTokenizer.from_pretrained(model_name)
+model_name = "/home/lym/QWen3-14B"
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
     torch_dtype="auto",
@@ -85,23 +129,58 @@ def model_judge(prompt: str):
     except Exception as e:
         print(f"❌ Judge失败: {e}")
         return ""
+def filter_with_llm(question: str, nodes: List[str], model="qwen-plus", api_key="sk-969f4200d53442a2a1733d1c0b1fb330") -> List[str]:
+    from dashscope import Generation
+    filtered = []
+    
+    for i, node_content in enumerate(nodes):
+        prompt = f"""
+    你是一名口腔医学知识图谱专家，请根据以下信息判断问题是否与节点内容相关,相关标准为问题出现节点名称或涉及节点相关属性，否则一律不相关。
+    【问题】
+    {question}
+    【节点内容】
+    {str(node_content)}
+    请回答：“相关”或“不相关”,不要输出无关内容。
+    """
+
+        try:
+            response = Generation.call(
+                model=model,
+                api_key=api_key,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                result_format="message"
+            )
+            reply = response["output"]["choices"][0]["message"]["content"].strip()
+            if "不相关" in reply:
+                continue
+            else:
+                filtered.append(node_content)
+        except Exception as e:
+            print(f"[!] LLM 筛选失败（节点{i}）：{e}")
+            continue
+
+    return filtered
 async def DentalMind_graph_inference(prompt):
     '''实现DentalMind模型的推理接口，输入用户的prompt，返回模型生成的文本信息'''
     # 1) 构建初始 Query‑Graph（实体+关系）
     entities = extract_query_entities(prompt)
-    graph=extract_entity_relations(prompt, entities)
+    print("Extracted entities:")
+    print(entities)
     vdb = EntityVectorStorage("/home/lym/GraphRAG4OralHealth/GraphRAG_System/data/node_properties_embeddings_typed.npz")
+    queries=await vdb.query(str(entities),"口腔疾病",3)
     neo4j_client = Neo4jClient(
         url="bolt://127.0.0.1:9687",
         user="neo4j",
         password="medical_neo4j"
     )
-    # 3) 用QueryGraphResolver补全图信息
-    resolver = QueryGraphResolver(vdb, neo4j_client)
-    resolved = await resolver.resolve(graph)
-    print("Resolved Query Graph:")
-    print(resolved)
-    prompt="你可以参考以下知识图中的实体和关系，回答以下问题：\n知识图谱:"+str(resolved)+"\n问题："+prompt+"要求：知识图谱信息不一定和问题答案相关，你需要斟酌，不一定采用，但知识图谱信息一定是正确无误的"
+    queries=[neo4j_client.get_properties_by_name(query['entity_name']) for query in queries]
+    filtered_contents = filter_with_llm(prompt, queries)
+    print("Filtered contents:")
+    print(filtered_contents)
+    if len(filtered_contents)>0:
+        prompt="你可以参考以下疾病信息，回答以下问题，请用尽量完整有逻辑地表达方式：\n知识图谱:"+str(filtered_contents)+prompt
     messages = [
         {"role": "system", "content": "你是一个医学知识问答机器人。"},
         {"role": "user", "content": prompt}
@@ -114,14 +193,61 @@ async def DentalMind_graph_inference(prompt):
     model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
     generated_ids = model.generate(
         **model_inputs,
-        max_new_tokens=2048
+        max_new_tokens=4096
     )
     generated_ids = [
         output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
     ]
     response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
     # 提取模型生成的文本
-    return response.strip(),graph
+    return response.strip(),filtered_contents
+async def DentalMind_graph_o1_inference(prompt):
+    '''实现DentalMind模型的推理接口，输入用户的prompt，返回模型生成的文本信息'''
+    # 1) 构建初始 Query‑Graph（实体+关系）
+    entities = extract_query_entities(prompt)
+    print("Extracted entities:")
+    print(entities)
+    vdb = EntityVectorStorage("/home/lym/GraphRAG4OralHealth/GraphRAG_System/data/node_properties_embeddings_typed.npz")
+    queries=await vdb.query(str(entities),"口腔疾病",3)
+    neo4j_client = Neo4jClient(
+        url="bolt://127.0.0.1:9687",
+        user="neo4j",
+        password="medical_neo4j"
+    )
+    queries=[neo4j_client.get_properties_by_name(query['entity_name']) for query in queries]
+    filtered_contents = filter_with_llm(prompt, queries)
+    print("Filtered contents:")
+    print(filtered_contents)
+    if len(filtered_contents)>0:
+        prompt="你可以参考以下疾病信息，回答以下问题，请用尽量完整有逻辑地表达方式：\n知识图谱:"+str(filtered_contents)+prompt
+    messages = [
+        {"role": "system", "content": "你是一个医学知识问答机器人。"},
+        {"role": "user", "content": prompt}
+    ]
+    text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True
+    )
+    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    generated_ids = model.generate(
+        **model_inputs,
+        max_new_tokens=4096
+    )
+    generated_ids = [
+        output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
+    ]
+    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    match = re.search(r"<content>(.*?)<content>", response, flags=re.DOTALL)
+    print(response)
+    if match:
+        response_content = match.group(1).strip()
+    else:
+        response_content = "No content found"
+    
+    print("Response content:", response_content)
+    # 提取模型生成的文本
+    return response_content.strip(),filtered_contents
 def DentalMind_base_inference(prompt):
     '''实现DentalMind模型的推理接口，输入用户的prompt，返回模型生成的文本信息'''
     messages = [
@@ -175,6 +301,50 @@ def DentalMind_o1_inference(prompt):
     return response_content.strip()
 #不同模型的推理接口，输入问题，返回答案
 def QWen25_7b_inference(prompt):
+    messages = [
+        {"role": "system", "content": "你是一个医学知识问答机器人。"},
+        {"role": "user", "content": prompt}
+    ]
+    text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True
+    )
+    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    generated_ids = model.generate(
+        **model_inputs,
+        max_new_tokens=1024
+    )
+    generated_ids = [
+        output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
+    ]
+    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    # 提取模型生成的文本
+    return response.strip()
+def QWen3_inference(prompt):
+    messages = [
+        {"role": "system", "content": "你是一个医学知识问答机器人。"},
+        {"role": "user", "content": prompt}
+    ]
+    text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False
+    )
+    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    generated_ids = model.generate(
+        **model_inputs,
+        max_new_tokens=1024
+    )
+    generated_ids = [
+        output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
+    ]
+    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    # 提取模型生成的文本
+    return response.strip()
+def QWen25_math_7b_inference(prompt):
+    print(model_name)
     messages = [
         {"role": "system", "content": "你是一个医学知识问答机器人。"},
         {"role": "user", "content": prompt}
@@ -389,3 +559,100 @@ def deepseek_r1_inference(prompt):
         ]
     )
     return completion.choices[0].message.content
+def deepseek_r1_distill_qwen_7b(prompt):
+    '''实现DentalMind模型的推理接口，输入用户的prompt，返回模型生成的文本信息'''
+    messages = [
+        {"role": "system", "content": "你是一个医学知识问答机器人。"},
+        {"role": "user", "content": prompt}
+    ]
+    text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True
+    )
+    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    generated_ids = model.generate(
+        **model_inputs,
+        max_new_tokens=4096
+    )
+    generated_ids = [
+        output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
+    ]
+    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+
+    # 提取 reasoning 和 content
+    if "</think>" in response:
+        reasoning_content, response_content = response.split("</think>")
+        response_content = response_content.strip()
+        reasoning_content = reasoning_content.strip()
+    else:
+        response_content = response
+        reasoning_content = ""
+
+
+    
+    return response_content.strip(), reasoning_content.strip()
+def deepseek_r1_distill_qwen_14b(prompt):
+    '''实现DentalMind模型的推理接口，输入用户的prompt，返回模型生成的文本信息'''
+    messages = [
+        {"role": "system", "content": "你是一个医学知识问答机器人。"},
+        {"role": "user", "content": prompt}
+    ]
+    text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True
+    )
+    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    generated_ids = model.generate(
+        **model_inputs,
+        max_new_tokens=4096
+    )
+    generated_ids = [
+        output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
+    ]
+    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+
+    # 提取 reasoning 和 content
+    if "</think>" in response:
+        reasoning_content, response_content = response.split("</think>")
+        response_content = response_content.strip()
+        reasoning_content = reasoning_content.strip()
+    else:
+        response_content = response
+        reasoning_content = ""
+
+
+    
+    return response_content.strip(), reasoning_content.strip()
+def deepseek_r1_distill_qwen_1b(prompt):
+    '''实现DentalMind模型的推理接口，输入用户的prompt，返回模型生成的文本信息'''
+    messages = [
+        {"role": "system", "content": "你是一个医学知识问答机器人。"},
+        {"role": "user", "content": prompt}
+    ]
+    text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True
+    )
+    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    generated_ids = model.generate(
+        **model_inputs,
+        max_new_tokens=4096
+    )
+    generated_ids = [
+        output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
+    ]
+    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    # 提取 reasoning 和 content
+    if "</think>" in response:
+        reasoning_content, response_content = response.split("</think>")
+        response_content = response_content.strip()
+        reasoning_content = reasoning_content.strip()
+    else:
+        response_content = response
+        reasoning_content = ""
+    return response_content.strip(), reasoning_content.strip()

@@ -3,7 +3,7 @@
 """
 llm_dental_eval_history.py
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-使用 Qwen-Plus 对口腔病史类主观题进行五维度评分。
+使用 Qwen-Plus 对口腔病史类主观题进行五维度评分，并增加临时文件机制。
 
 CLI:
     python llm_dental_eval_history.py 模型答案.json 参考答案.json 输出结果.jsonl --max_qps 1
@@ -13,6 +13,7 @@ import json
 import os
 import time
 import re
+from pathlib import Path
 from dashscope import Generation
 
 # ========= 1. 中文评分 Rubric 与 Prompt =========
@@ -167,21 +168,57 @@ def main():
     ref_map = {c["病史"].strip(): c for c in ref_cases}
 
     results = []
-    for idx, case in enumerate(model_cases, start=1):
-        history = case["病史"].strip()
-        if history not in ref_map:
-            print(f"❌ 第{idx}题：未找到匹配的参考答案，跳过")
-            continue
-        ref_case = ref_map[history]
-        result = grade_one(f"Case{idx}", case, ref_case, api_key, 1 / args.max_qps)
-        results.append(result)
-        print(f"✅ Case{idx} 完成，总分: {result.get('总分', '?')}")
+    temp_file = Path(args.output_file).with_suffix(".tmp.jsonl")  # 临时文件路径
 
-    with open(args.output_file, "w", encoding="utf-8") as fout:
-        for item in results:
-            fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+    try:
+        # 恢复进度
+        if temp_file.exists():
+            print(f"⚠️ 发现临时文件 {temp_file}，尝试恢复进度...")
+            with open(temp_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    results.append(json.loads(line))
+            print(f"✅ 已从临时文件恢复 {len(results)} 条记录。")
 
-    print(f"\n🎉 共完成评分 {len(results)} 条病史题，结果已写入 {args.output_file}")
+        for idx, case in enumerate(model_cases, start=1):
+            history = case["病史"].strip()
+            if history not in ref_map:
+                print(f"❌ 第{idx}题：未找到匹配的参考答案，跳过")
+                continue
+            ref_case = ref_map[history]
+
+            try:
+                result = grade_one(f"Case{idx}", case, ref_case, api_key, 1 / args.max_qps)
+                results.append(result)
+                print(f"✅ Case{idx} 完成，总分: {result.get('总分', '?')}")
+            except Exception as e:
+                print(f"⚠️ 评分失败：题目 {case['病史'][:20]}... 错误信息：{e}")
+                # 将当前结果保存到临时文件
+                with open(temp_file, "w", encoding="utf-8") as f:
+                    for r in results:
+                        f.write(json.dumps(r, ensure_ascii=False) + "\n")
+                print(f"⚠️ 已将当前进度保存到临时文件 {temp_file}。")
+                raise  # 继续抛出异常，终止程序
+
+            # 定期保存到临时文件
+            if idx % 10 == 0:  # 每处理 10 道题保存一次
+                with open(temp_file, "w", encoding="utf-8") as f:
+                    for r in results:
+                        f.write(json.dumps(r, ensure_ascii=False) + "\n")
+                print(f"✅ 已将当前进度保存到临时文件 {temp_file}。")
+
+    finally:
+        # 程序结束时清理临时文件并写入最终结果
+        if results:
+            with open(args.output_file, "w", encoding="utf-8") as f:
+                for r in results:
+                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            print(f"\n✅ 共评测 {len(results)} 题，结果已写入 {args.output_file}")
+
+            if temp_file.exists():
+                temp_file.unlink()  # 删除临时文件
+                print(f"✅ 已删除临时文件 {temp_file}。")
+        else:
+            print("⚠️ 未生成任何结果。")
 
 if __name__ == "__main__":
     main()

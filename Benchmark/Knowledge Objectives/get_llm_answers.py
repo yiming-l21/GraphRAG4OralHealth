@@ -4,7 +4,7 @@ import glob
 from inference_wrappers import (
     deepseek_inference, XunfeiSpark_inference, QWenplus_inference,
     ChatGLM_inference, GPT4_inference, GPT3_inference, QWen25_7b_inference,
-    deepseek_r1_inference, DentalMind_o1_inference, DentalMind_base_inference,DentalMind_graph_inference
+    deepseek_r1_inference, DentalMind_o1_inference, DentalMind_base_inference,DentalMind_graph_inference,deepseek_r1_distill_qwen_7b,deepseek_r1_distill_qwen_1b,QWen25_math_7b_inference,deepseek_r1_distill_qwen_14b,DentalMind_graph_o1_inference
 )
 
 # ------------ 模型配置区 ------------
@@ -19,11 +19,19 @@ model_config_dict = {
     "deepseek_r1": {"model": deepseek_r1_inference},
     "DentalMind_o1": {"model": DentalMind_o1_inference},
     "DentalMind_base": {"model": DentalMind_base_inference},
-    "DentalMind_graph":{"model": DentalMind_graph_inference}
+    "DentalMind_graph":{"model": DentalMind_graph_inference},
+    "DentalMind_graph_o1":{"model": DentalMind_graph_o1_inference},
+    "DeepSeek-R1-Distill-Qwen-7B": {"model": deepseek_r1_distill_qwen_7b},
+    "DeepSeek-R1-Distill-Qwen-1.5B": {"model": deepseek_r1_distill_qwen_1b},
+    "DeepSeek-R1-Distill-Qwen-14B": {"model": deepseek_r1_distill_qwen_14b},
+    "QWen25-Math-7B": {"model": QWen25_math_7b_inference},
+    "QWen25-Math-1.5B": {"model": QWen25_math_7b_inference},
+    "QWen25-14B": {"model": QWen25_math_7b_inference},
+    "QWen3-14B": {"model": QWen25_math_7b_inference},
 }
 
 # 选择模型名称
-model_name = "DentalMind_graph"
+model_name = "QWen3-14B"
 model_inference = model_config_dict[model_name]["model"]
 
 # 保存路径
@@ -43,12 +51,13 @@ def save_result(result_dict, topic, json_path):
 # ------------ 主推理函数（单线程） ------------
 from tqdm import tqdm
 
-async def get_answer(directory_path, model_inference, topic):
-    async def process_question(ques_text):
-        response_content, reasoning_content = await model_inference(ques_text)
+def get_answer(directory_path, model_inference, topic):
+    def process_question(ques_text):
         print(ques_text)
+        response_content =model_inference(ques_text)
         print(response_content)
-        return response_content, reasoning_content
+
+        return response_content
     all_json_paths = glob.glob(os.path.join(directory_path, '*.json'))
     for json_path in all_json_paths:
         result_list=[]
@@ -64,13 +73,13 @@ async def get_answer(directory_path, model_inference, topic):
                 "注意只需要输出选项前字母，不需要输出任何其他内容。\n"
                 f"题目:\n{question.get('题干', question.get('题目'))}\n选项:\n{question['选项']}"
             )
-            res_content, res_reasoning =await process_question(ques_text)
+            res_content =process_question(ques_text)
             result_list.append({
                 "题目": question.get('题干', question.get('题目')),
                 "选项": question['选项'],
                 "gt": question['答案'],
-                "prediction": res_content,
-                "reason": res_reasoning
+                "prediction": res_content
+                
             })
 
         # 共用题干题
@@ -82,13 +91,13 @@ async def get_answer(directory_path, model_inference, topic):
                     "注意只需要输出选项前字母，不需要输出任何其他内容。\n"
                     f"题目:\n{question['共用题干']}\n{question['题干'][idx]}\n选项:\n{question['选项'][idx]}"
                 )
-                res_content, res_reasoning = process_question(ques_text)
+                res_content =process_question(ques_text)
                 result_list.append({
                     "题目": question['题干'][idx],
                     "选项": question['选项'][idx],
                     "gt": question['答案'][idx],
-                    "prediction": res_content,
-                    "reason": res_reasoning
+                    "prediction": res_content
+                   
                 })
 
         # 共用备选题
@@ -100,15 +109,13 @@ async def get_answer(directory_path, model_inference, topic):
                     "注意只需要输出选项前字母，不需要输出任何其他内容。\n"
                     f"题目:\n{question['题干'][idx]}\n选项:\n{question['选项']}"
                 )
-                res_content, res_reasoning = process_question(ques_text)
+                res_content=process_question(ques_text)
                 result_list.append({
                     "题目": question['题干'][idx],
                     "选项": question['选项'],
                     "gt": question['答案'][idx],
-                    "prediction": res_content,
-                    "reason": res_reasoning
+                    "prediction": res_content
                 })
-        print(result_list[:3])
         save_result(result_list, topic, json_path)
 
 
@@ -116,17 +123,17 @@ async def get_answer(directory_path, model_inference, topic):
 import os
 import asyncio  # 别忘了引入 asyncio
 
-async def main():
-    topic_list = ["MedicalHumanity", "Clinical", "Dentistry", "Medical"]
+def main():
+    topic_list=["MedicalHumanity","Clinical","Dentistry","Medical"]
     directory_path = "/home/lym/GraphRAG4OralHealth/Benchmark/Knowledge Objectives/"
 
     for topic in topic_list:
         path = os.path.join(directory_path, topic)
-        await get_answer(path, model_inference, topic)
+        get_answer(path, model_inference, topic)
 
     print("✅ 所有题目处理完毕！")
 
 # ------------ 运行入口 ------------
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
 

@@ -3,6 +3,35 @@ import dashscope
 import json
 
 dashscope.api_key = "sk-969f4200d53442a2a1733d1c0b1fb330"
+ENTITY_EXTRACTION_PROMPT_SPECIAL= """
+你是一个医学诊断结构化助手，任务是从提供的完整病例病史中提取结构化医学诊断信息，以便后续知识图谱匹配和问答增强。
+
+请根据以下输入的病史材料，输出符合下列字段要求的 JSON block：
+
+- 疾病名称,不要猜测，用?表示
+- 诊断原则（包括主诉、现病史、体征、检查等方面的要点列表）
+- 治疗方法（包括紧急处理、基础治疗、长期方案和预防措施等）
+
+注意事项：
+1. 请仅输出一个 JSON block；
+2. 如果病例涉及多种可能疾病（如牙周炎、联合病变等），优先选择最明确的主要诊断；
+3. 请参考如下格式输出：
+
+"?": {{
+    "疾病定义": "......",
+    "诊断原则": [
+        "...",
+        "..."
+    ],
+    "治疗方法": [
+        "...",
+        "..."
+    ]
+}}
+
+请对以下病例材料进行结构化处理：
+{query}
+"""
 
 ENTITY_EXTRACTION_PROMPT = """
 你是一个医学知识图谱实体提取助手，请根据用户的复杂问题提取所有可能参与知识图谱检索的医学实体。
@@ -43,17 +72,38 @@ ENTITY_EXTRACTION_PROMPT = """
 请提取下面这个问题的实体：
 "{query}"
 """
+import re
+def extract_wrapped_json_from_markdown(content: str):
+    """
+    从 markdown 中的 ```json 块中提取并包装为合法 JSON 对象。
+    如果成功返回 dict，否则返回 None。
+    """
+    pattern = r"```json\s*(.*?)\s*```"  # 非贪婪提取 ```json ... ``` 中的内容
+    match = re.search(pattern, content, re.DOTALL)
 
+    if not match:
+        return None
+
+    json_fragment = match.group(1).strip()
+
+    # 尝试包装为完整 JSON：添加花括号
+    wrapped = f"{{{json_fragment}}}"
+
+    try:
+        return json.loads(wrapped)
+    except json.JSONDecodeError as e:
+        print(f"[解析失败] JSONDecodeError: {e}")
+        return None
 def extract_query_entities(query: str) -> list:
-    prompt = ENTITY_EXTRACTION_PROMPT.format(query=query)
+    prompt = ENTITY_EXTRACTION_PROMPT_SPECIAL.format(query=query)
     try:
         response = dashscope.Generation.call(
-            model="qwen-max",
+            model="qwen-plus",
             prompt=prompt,
             result_format='message'
         )
         content = response["output"]["choices"][0]["message"]["content"]
-        return json.loads(content)
+        return extract_wrapped_json_from_markdown(content)
     except Exception as e:
         print(f"❌ 实体抽取失败: {e}")
         return []

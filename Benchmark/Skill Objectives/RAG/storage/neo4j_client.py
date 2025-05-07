@@ -11,7 +11,17 @@ class Neo4jClient:
         with self.driver.session() as session:
             result = session.run(cypher, **params)
             return [record.data() for record in result]
-
+    def get_properties_by_name(self, name: str) -> dict:
+        """
+        根据实体名称获取实体的属性
+        """
+        query = (
+            "MATCH (e) "
+            "WHERE toLower(e.名称) = toLower($name) "
+            "RETURN e.名称 AS name, e.id AS id, labels(e) AS labels, properties(e) AS properties"
+        )
+        result = self.run(query, name=name)
+        return result[0] if result else {}
     def search_entity(self, mention: str, topk: int = 5) -> list[dict]:
         """
         原来的实体检索，根据名称或别名模糊匹配

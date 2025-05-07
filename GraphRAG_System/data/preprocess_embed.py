@@ -16,8 +16,7 @@ NEO4J_URL = "bolt://127.0.0.1:9687"
 NEO4J_USER = "neo4j"
 NEO4J_PASSWORD = "medical_neo4j"
 
-# 保存文件路径
-SAVE_PATH = "node_name_embeddings_typed.npz"
+
 
 # ====================
 # Step 2: 获取节点数据
@@ -109,7 +108,9 @@ def save_embeddings_to_disk(node_ids: List[str],node_labels: List[str], embeddin
         embeddings=np.array(embeddings, dtype=np.float32)
     )
     print(f"[✔] 嵌入向量保存完成，共 {len(node_ids)} 条，路径：{save_path}")
-
+# 保存文件路径
+SAVE_PATH1 = "node_name_embeddings_typed.npz"
+SAVE_PATH2 = "node_properties_embeddings_typed.npz"
 # ====================
 # 主函数执行流程
 # ====================
@@ -125,7 +126,12 @@ def main():
     embeddings = get_embedding(node_ids)
 
     print("💾 正在保存嵌入向量到本地...")
-    save_embeddings_to_disk(node_ids,node_labels,embeddings, SAVE_PATH)
+    save_embeddings_to_disk(node_ids,node_labels,embeddings, SAVE_PATH1)
+    print("🧠 正在生成 Qwen text-embedding-v3 向量...")
+    embeddings = get_embedding(node_texts)
+
+    print("💾 正在保存嵌入向量到本地...")
+    save_embeddings_to_disk(node_ids,node_labels,embeddings, SAVE_PATH2)
 
 if __name__ == "__main__":
     main()

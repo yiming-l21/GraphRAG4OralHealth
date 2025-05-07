@@ -85,7 +85,7 @@ def process_json_files(base_dir):
         # 遍历科目目录
         for subject in os.listdir(topic_path):
             subject_path = os.path.join(topic_path, subject)
-            subject1=subject.split(".")[0].split("_")[-2]
+            subject1=subject.split(".j")[0].split("_")[-2]
             model_result[topic][subject1] = []
             with open(subject_path, 'r', encoding='utf-8') as f:
                 try:
@@ -118,7 +118,8 @@ def eval_model(model_result, result_dict):
                 print("result",result_dict[topic].keys())
                 print("model",model_result[topic].keys())
             for gt,pred in zip(result_dict[topic][subject],model_result[topic][subject]):
-                if gt["答案"] == pred["答案"] or gt["答案"] in pred["答案"]:
+                # 判断正确性
+                if gt["答案"] == pred['答案'] or pred['答案'].startswith(gt["答案"]): 
                     model_eval[topic][subject]["正确"].append(pred)
                 else:
                     model_eval[topic][subject]["错误"].append(pred)
@@ -270,8 +271,8 @@ from openpyxl.styles import Font
 excel_path = "模型评估结果_最终版.xlsx"
 custom_model_order = [
     "GPT-4-turbo", "GPT-3.5-turbo", "deepseek-v3", "deepseek-r1",
-    "Qwen-max", "Qwen-plus", "QWen2.5-7b-instruct", "ChatGLM-4",
-    "XunfeiSpark", "DentalMind_base", "DentalMind_o1", "DentalMind_o1+GraphRAG"
+    "Qwen-max", "Qwen-plus","QWen3-14B", "QWen2.5-7b-instruct", "QWen3-8B","ChatGLM-4",
+    "XunfeiSpark", "DentalMind_base", "DentalMind_o1", "DentalMind_graph","DeepSeek-R1-Distill-Qwen-7B","QWen25-Math-7B","DeepSeek-R1-Distill-Qwen-1.5B","QWen25-14B","DeepSeek-R1-Distill-Qwen-14B","DentalMind_graph_o1"
 ]
 
 columns = ["科目", "数量"] + custom_model_order

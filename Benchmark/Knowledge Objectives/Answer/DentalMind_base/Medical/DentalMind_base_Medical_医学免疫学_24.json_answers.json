@@ -309,7 +309,7 @@
             "E.C5b67n"
         ],
         "gt": "C",
-        "prediction": "C"
+        "prediction": "D"
     },
     {
         "题目": "关于MBL途径，说法正确的是     ",
@@ -477,7 +477,7 @@
             "E.TD-Ag   无论多少剂量均不易引起T细胞耐受"
         ],
         "gt": "A",
-        "prediction": "A/B/C/D/E"
+        "prediction": "A"
     },
     {
         "题目": "诱生免疫耐受的是",
@@ -585,7 +585,7 @@
             "E.Graves病"
         ],
         "gt": "B",
-        "prediction": "B/C"
+        "prediction": "B"
     },
     {
         "题目": "参与I型超敏反应的最重要的Ig是",
@@ -633,7 +633,7 @@
             "E.1  型糖尿病"
         ],
         "gt": "A",
-        "prediction": "E"
+        "prediction": "A"
     },
     {
         "题目": "X连锁无丙种球蛋白血症是属于",
