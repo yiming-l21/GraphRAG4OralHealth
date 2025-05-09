@@ -118,6 +118,10 @@ def process_files(directory, neo4j_storage):
                 node1_label = "预防"
                 node2_label = "口腔疾病"
                 relation_type = "预防"
+            elif "疾病表现为症状" in filename:
+                node1_label = "口腔疾病"
+                node2_label = "症状"
+                relation_type = "表现为"
             else:
                 print(f"未知文件类型：{filename}")
                 continue

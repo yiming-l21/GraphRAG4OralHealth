@@ -1,0 +1,22 @@
+[33mc89d7fc[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m)[m HEAD@{0}: commit: update
+[33m71e227c[m HEAD@{1}: reset: moving to HEAD~3
+[33m7de8d43[m HEAD@{2}: commit: ignore large file
+[33m2557816[m HEAD@{3}: commit: update
+[33mbe04167[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{4}: reset: moving to HEAD~3
+[33m61b25b4[m HEAD@{5}: commit: update
+[33m8a9588c[m HEAD@{6}: commit: feat:sft
+[33m0fd65fe[m HEAD@{7}: commit: feat:SFT data&paper neo4j
+[33mbe04167[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{8}: commit: feat:graph_construct complete v1
+[33m71e227c[m HEAD@{9}: reset: moving to HEAD~2
+[33m6da14f0[m HEAD@{10}: commit: Remove OralGraph/data/ from cache and ignore in .gitignore
+[33mcee8d90[m HEAD@{11}: commit: feat:graph_construction complete v1
+[33m71e227c[m HEAD@{12}: reset: moving to HEAD~2
+[33m9bae4c2[m HEAD@{13}: commit: Remove large files from cache and ignore OralGraph/data/
+[33m821aee9[m HEAD@{14}: commit: feat:graph_construction complete v1
+[33m71e227c[m HEAD@{15}: commit: evaluation_option(completed)
+[33mc60fcfc[m HEAD@{16}: reset: moving to HEAD~3
+[33m8027c55[m HEAD@{17}: commit: evaluation_option(completed)
+[33m79310cc[m HEAD@{18}: commit: evaluation_option(completed)
+[33m82a8339[m HEAD@{19}: commit: CNKI data completed
+[33mc60fcfc[m HEAD@{20}: commit: benchmark(IID options completed)
+[33m93b69fc[m HEAD@{21}: clone: from git@github.com:yiming-l21/GraphRAG4OralHealth.git
